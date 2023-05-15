@@ -100,19 +100,22 @@ class Corpus:
         train = pd.DataFrame(columns=validated.columns)
         dev = pd.DataFrame(columns=validated.columns)
         test = pd.DataFrame(columns=validated.columns)
+        eval = pd.DataFrame(columns=validated.columns)
 
-        train_size = dev_size = test_size = 0
+        train_size = dev_size = test_size = eval_size = 0
 
         if (len(validated) > 0):
-            # Determine train, dev, and test sizes
-            train_size, dev_size, test_size = self._calculate_data_set_sizes(len(validated))
-            # Split into train, dev, and test datasets
+            # Determine train, dev, test and eval sizes
+            train_size, dev_size, test_size, eval_size = self._calculate_data_set_sizes(len(validated))
+            # Split into train, dev, test and eval datasets
             continous_client_index, uniques = pd.factorize(validated["client_id"])
             validated["continous_client_index"] = continous_client_index
 
             for i in range(max(continous_client_index), -1, -1):
                 if len(test) + len(validated[validated["continous_client_index"] == i]) <= test_size:
                     test = pd.concat([test, validated[validated["continous_client_index"] == i]], sort=False)
+                elif len(eval) + len(validated[validated["continous_client_index"] == i]) <= eval_size:
+                    eval = pd.concat([eval, validated[validated["continous_client_index"] == i]], sort=False)
                 elif len(dev) + len(validated[validated["continous_client_index"] == i]) <= dev_size:
                     dev = pd.concat([dev, validated[validated["continous_client_index"] == i]], sort=False)
                 else:
@@ -120,6 +123,7 @@ class Corpus:
 
         self.train = train.drop(columns="continous_client_index", errors="ignore")
         self.dev = dev.drop(columns="continous_client_index", errors="ignore")
+        self.eval = eval.drop(columns="continous_client_index", errors="ignore")
         self.test = test[:train_size].drop(columns="continous_client_index", errors="ignore")
 
     def _calculate_data_set_sizes(self, total_size):
@@ -129,8 +133,9 @@ class Corpus:
             if 2 * calculated_sample_size + train_size <= total_size:
                 dev_size = calculated_sample_size
                 test_size = calculated_sample_size
+                eval_size = calculated_sample_size
                 break
-        return train_size, dev_size, test_size
+        return train_size, dev_size, test_size, eval_size
 
     def save(self, directory):
         """Saves this :class:`corporacreator.Corpus` in `directory`.
@@ -141,7 +146,7 @@ class Corpus:
         directory = os.path.join(directory, self.locale)
         if not os.path.exists(directory):
             os.mkdir(directory)
-        datasets = ["other", "invalidated", "validated", "train", "dev", "test"]
+        datasets = ["other", "invalidated", "validated", "train", "dev", "test", "eval"]
 
         _logger.debug("Saving %s corpora..." % self.locale)
         for dataset in datasets:
